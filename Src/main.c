@@ -77,6 +77,8 @@ uint16_t nrf_input_data[5] = {0, 0, 0, 0, 0};
 uint32_t nrf24_data_has_been_captured = 0;
 uint32_t nrf24_safety_counter = 0;
 
+int32_t current_duty_cycle = 0;
+
 int main(void)
 {
 	// ****** Motor 1 initialization ****** //
@@ -122,14 +124,55 @@ int main(void)
 
 //	delay_in_milliseconds(100);
 
+	GPIOD->ODR |= 0x02;
+
 	// NRF24L01+ device setup
 	add_to_mistakes_log(nrf24_basic_init(&robot_nrf24));
 	add_to_mistakes_log(nrf24_enable_pipe1(&robot_nrf24, nrf24_rx_address));
 	add_to_mistakes_log(nrf24_enable_interrupts(&robot_nrf24, yes, no, no));
 	add_to_mistakes_log(nrf24_rx_mode(&robot_nrf24));
 
+	// led
+	motor1.set_pwm_duty_cycle(-1 * PWM_PRECISION);
+
+
 	while(1)
 	{
+
+
+		// *** Testing of RGB strip control *** //
+
+		uint32_t counter_value = PWM_PRECISION / 10;
+
+		for (uint32_t i = 0; i < counter_value; ++i)
+		{
+			motor2.set_pwm_duty_cycle (i*10);
+
+			delay_in_milliseconds(10);
+		}
+
+		for (uint32_t i = 0; i < counter_value; ++i)
+		{
+			motor2.set_pwm_duty_cycle (PWM_PRECISION  - i*10);
+			delay_in_milliseconds(10);
+		}
+
+
+		for (uint32_t i = 0; i < counter_value; ++i)
+		{
+			motor2.set_pwm_duty_cycle (-1 * (float)(i*10));
+
+			delay_in_milliseconds(10);
+		}
+
+		for (uint32_t i = 0; i < counter_value; ++i)
+		{
+			motor2.set_pwm_duty_cycle (-1 * (float)(PWM_PRECISION) + (float)(i*10));
+			delay_in_milliseconds(10);
+		}
+
+
+
 //		// *** Testing of position control for differential drive robot *** //
 //
 //		// For my position control system to properly work i need to use increments and not absolute values.
@@ -184,10 +227,10 @@ void SysTick_Handler()
 		speed_loop_call_counter = 0;
 		motors_get_speed_by_incements(&motor1, SPEED_LOOP_PERIOD);
 		motors_get_speed_by_incements(&motor2, SPEED_LOOP_PERIOD);
-		float m1_speed_task = motors_speed_controller_handler(&motor1, SPEED_LOOP_PERIOD);
-		float m2_speed_task = motors_speed_controller_handler(&motor2, SPEED_LOOP_PERIOD);
-		motor1.set_pwm_duty_cycle((int32_t)m1_speed_task);
-		motor2.set_pwm_duty_cycle((int32_t)m2_speed_task);
+//		float m1_speed_task = motors_speed_controller_handler(&motor1, SPEED_LOOP_PERIOD);
+//		float m2_speed_task = motors_speed_controller_handler(&motor2, SPEED_LOOP_PERIOD);
+//		motor1.set_pwm_duty_cycle((int32_t)m1_speed_task);
+//		motor2.set_pwm_duty_cycle((int32_t)m2_speed_task);
 	}
 
 //	// *** Position control handling *** //
