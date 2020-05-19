@@ -79,6 +79,10 @@ uint32_t nrf24_safety_counter = 0;
 
 int32_t current_duty_cycle = 0;
 
+uint16_t adc_current_value [2] = {0,0};
+float current_input_voltage = 0.0f;
+float current_divider_voltage = 0.0f;
+
 int main(void)
 {
 	// ****** Motor 1 initialization ****** //
@@ -135,41 +139,91 @@ int main(void)
 	// led
 	motor1.set_pwm_duty_cycle(-1 * PWM_PRECISION);
 
+	// *** ADC setup for voltage measurement testing *** //
+
+	// ADC and DMA clocking enable
+	RCC->APBENR2 |= RCC_APBENR2_ADCEN;
+	RCC->AHBENR |= RCC_AHBENR_DMA1EN;
+
+	// Enable voltage regulator
+	ADC1->CR |= ADC_CR_ADVREGEN;
+	delay_in_milliseconds(2);
+
+	// ADC calibration
+	ADC1->CR |= ADC_CR_ADCAL;
+	while(ADC1->CR & ADC_CR_ADCAL){} // Wait until calibration is complite
+
+	// Enable ADC
+	ADC1->ISR |= ADC_ISR_ADRDY; // clear ready flag
+	ADC1->CR |= ADC_CR_ADEN;
+	while(!(ADC1->ISR & ADC_ISR_ADRDY)){} // Wait until adc is ready
+
+	// Sampling time setup
+	ADC1->SMPR |= 2 << ADC_SMPR_SMP1_Pos; // All channels will use sampling time of smp1 which is 12.5 ADC clock cycles
+
+	// Sampling sequence setup
+	ADC1->CFGR1 |= ADC_CFGR1_CHSELRMOD;		// Enable sequencer ??
+	ADC1->CHSELR |= 0xF << ADC_CHSELR_SQ2_Pos | 0 << ADC_CHSELR_SQ1_Pos; // only ADC1_IN0 is scuned
+	while(!(ADC1->ISR & ADC_ISR_CCRDY)){}
+	ADC1->CFGR1 |= ADC_CFGR1_DMACFG | ADC_CFGR1_DMAEN; // enable DMA
+
+	// DMA channel 1 setup
+	DMA1_Channel1->CPAR = (uint16_t *)&(ADC1->DR);	// Direct read from TIM15->CNT regester
+	DMA1_Channel1->CMAR = (uint16_t *)adc_current_value;	// Memory address to write to. Уже указатель, поэтому нет необходимости получать его адрес
+
+	// for 3 conversions
+	DMA1_Channel1->CNDTR = 1;			// Number of transfers
+	DMA1_Channel1->CCR |= 1 << DMA_CCR_MSIZE_Pos | 1 << DMA_CCR_PSIZE_Pos | DMA_CCR_MINC | DMA_CCR_CIRC;		// 16 bit in and out, circular mode, increment in memmory
+	DMAMUX1_Channel0->CCR |= (5 << DMAMUX_CxCR_DMAREQ_ID_Pos); 	// ADC is 5
+	DMA1_Channel1->CCR |= DMA_CCR_EN;		// enable DMA
+
+
+	// *** End of ADC and DMA setup *** //
 
 	while(1)
 	{
 
+		delay_in_milliseconds(200);
+		GPIOD->ODR ^= 0x06;
+		ADC1->CR |= ADC_CR_ADSTART;
+		while(!(ADC1->ISR & ADC_ISR_EOS)){} // wait until sequence is complete
+		ADC1->ISR |= ADC_ISR_EOS;
 
-		// *** Testing of RGB strip control *** //
+		current_divider_voltage = (float)(adc_current_value[0])/4096.0f * 3.3f;
+		current_input_voltage = current_divider_voltage * 3.818f;
 
-		uint32_t counter_value = PWM_PRECISION / 10;
+		// Testing ADC
 
-		for (uint32_t i = 0; i < counter_value; ++i)
-		{
-			motor2.set_pwm_duty_cycle (i*10);
-
-			delay_in_milliseconds(10);
-		}
-
-		for (uint32_t i = 0; i < counter_value; ++i)
-		{
-			motor2.set_pwm_duty_cycle (PWM_PRECISION  - i*10);
-			delay_in_milliseconds(10);
-		}
-
-
-		for (uint32_t i = 0; i < counter_value; ++i)
-		{
-			motor2.set_pwm_duty_cycle (-1 * (float)(i*10));
-
-			delay_in_milliseconds(10);
-		}
-
-		for (uint32_t i = 0; i < counter_value; ++i)
-		{
-			motor2.set_pwm_duty_cycle (-1 * (float)(PWM_PRECISION) + (float)(i*10));
-			delay_in_milliseconds(10);
-		}
+//		// *** Testing of RGB strip control *** //
+//
+//		uint32_t counter_value = PWM_PRECISION / 10;
+//
+//		for (uint32_t i = 0; i < counter_value; ++i)
+//		{
+//			motor2.set_pwm_duty_cycle (i*10);
+//
+//			delay_in_milliseconds(10);
+//		}
+//
+//		for (uint32_t i = 0; i < counter_value; ++i)
+//		{
+//			motor2.set_pwm_duty_cycle (PWM_PRECISION  - i*10);
+//			delay_in_milliseconds(10);
+//		}
+//
+//
+//		for (uint32_t i = 0; i < counter_value; ++i)
+//		{
+//			motor2.set_pwm_duty_cycle (-1 * (float)(i*10));
+//
+//			delay_in_milliseconds(10);
+//		}
+//
+//		for (uint32_t i = 0; i < counter_value; ++i)
+//		{
+//			motor2.set_pwm_duty_cycle (-1 * (float)(PWM_PRECISION) + (float)(i*10));
+//			delay_in_milliseconds(10);
+//		}
 
 
 
