@@ -70,9 +70,16 @@ position_control motor2_position_controller =
 // *********************************** //
 nrf24l01p robot_nrf24 = {.device_was_initialized = 0};
 
-uint8_t nrf24_rx_address[5] = {0xAA,0xBB,0xCC,0xEE,0x15};	// green LEDs car
+uint8_t nrf24_rx_address[5] = {0x11, 0x22, 0x33, 0x44, 0x55}; // green-LED controller
+//uint8_t nrf24_rx_address[5] = {0x11, 0x22, 0x33, 0x44, 0x66}; // blue-LED controller
+//uint8_t nrf24_rx_address[5] = {0x11, 0x22, 0x33, 0x44, 0x77}; // yellow-LED controller
+//uint8_t nrf24_rx_address[5] = {0x11, 0x22, 0x33, 0x44, 0x88}; // red-LED controller
+//uint8_t nrf24_rx_address[5] = {0x11, 0x22, 0x33, 0x44, 0x99}; // white-LED controller
+
+//uint8_t nrf24_rx_address[5] = {0xAA,0xBB,0xCC,0xEE,0x15};	// green LEDs car
 //uint8_t nrf24_rx_address[5] = {0xAA,0xBB,0xCC,0xEE,0x25};	// blue LEDs car
-uint16_t nrf_input_data[5] = {0, 0, 0, 0, 0};
+uint8_t nrf_input_data[6] = {0, 0, 0, 0, 0, 0};
+float nrf_debug_array[3] = {0.0f, 0.0f, 0.0f};
 
 uint32_t nrf24_data_has_been_captured = 0;
 uint32_t nrf24_safety_counter = 0;
@@ -116,15 +123,17 @@ int main(void)
 	robot_nrf24.csn_low = gpiob1_low;
 	robot_nrf24.spi_write_byte = spi1_write_single_byte;
 	robot_nrf24.frequency_channel = 45;
-	robot_nrf24.payload_size_in_bytes = 10;
-	robot_nrf24.power_output = nrf24_pa_high;
-	robot_nrf24.data_rate = nrf24_1_mbps;
+	robot_nrf24.payload_size_in_bytes = 6;
+	robot_nrf24.power_output = nrf24_pa_max;
+	robot_nrf24.data_rate = nrf24_250_kbps;
 
 	// Init MCU peripherals
 	full_device_setup(yes, yes);
 
 	// Enables both motors
 	motor1.motor_enable();
+//	motor1.set_pwm_duty_cycle(0);
+//	motor2.set_pwm_duty_cycle(0);
 
 //	delay_in_milliseconds(100);
 
@@ -136,46 +145,46 @@ int main(void)
 	add_to_mistakes_log(nrf24_enable_interrupts(&robot_nrf24, yes, no, no));
 	add_to_mistakes_log(nrf24_rx_mode(&robot_nrf24));
 
-	// led
-	motor1.set_pwm_duty_cycle(-1 * PWM_PRECISION);
+//	// led
+//	motor1.set_pwm_duty_cycle(-1 * PWM_PRECISION);
 
 	// *** ADC setup for voltage measurement testing *** //
 
-	// ADC and DMA clocking enable
-	RCC->APBENR2 |= RCC_APBENR2_ADCEN;
-	RCC->AHBENR |= RCC_AHBENR_DMA1EN;
-
-	// Enable voltage regulator
-	ADC1->CR |= ADC_CR_ADVREGEN;
-	delay_in_milliseconds(2);
-
-	// ADC calibration
-	ADC1->CR |= ADC_CR_ADCAL;
-	while(ADC1->CR & ADC_CR_ADCAL){} // Wait until calibration is complite
-
-	// Enable ADC
-	ADC1->ISR |= ADC_ISR_ADRDY; // clear ready flag
-	ADC1->CR |= ADC_CR_ADEN;
-	while(!(ADC1->ISR & ADC_ISR_ADRDY)){} // Wait until adc is ready
-
-	// Sampling time setup
-	ADC1->SMPR |= 2 << ADC_SMPR_SMP1_Pos; // All channels will use sampling time of smp1 which is 12.5 ADC clock cycles
-
-	// Sampling sequence setup
-	ADC1->CFGR1 |= ADC_CFGR1_CHSELRMOD;		// Enable sequencer ??
-	ADC1->CHSELR |= 0xF << ADC_CHSELR_SQ2_Pos | 0 << ADC_CHSELR_SQ1_Pos; // only ADC1_IN0 is scuned
-	while(!(ADC1->ISR & ADC_ISR_CCRDY)){}
-	ADC1->CFGR1 |= ADC_CFGR1_DMACFG | ADC_CFGR1_DMAEN; // enable DMA
-
-	// DMA channel 1 setup
-	DMA1_Channel1->CPAR = (uint16_t *)&(ADC1->DR);	// Direct read from TIM15->CNT regester
-	DMA1_Channel1->CMAR = (uint16_t *)adc_current_value;	// Memory address to write to. Уже указатель, поэтому нет необходимости получать его адрес
-
-	// for 3 conversions
-	DMA1_Channel1->CNDTR = 1;			// Number of transfers
-	DMA1_Channel1->CCR |= 1 << DMA_CCR_MSIZE_Pos | 1 << DMA_CCR_PSIZE_Pos | DMA_CCR_MINC | DMA_CCR_CIRC;		// 16 bit in and out, circular mode, increment in memmory
-	DMAMUX1_Channel0->CCR |= (5 << DMAMUX_CxCR_DMAREQ_ID_Pos); 	// ADC is 5
-	DMA1_Channel1->CCR |= DMA_CCR_EN;		// enable DMA
+//	// ADC and DMA clocking enable
+//	RCC->APBENR2 |= RCC_APBENR2_ADCEN;
+//	RCC->AHBENR |= RCC_AHBENR_DMA1EN;
+//
+//	// Enable voltage regulator
+//	ADC1->CR |= ADC_CR_ADVREGEN;
+//	delay_in_milliseconds(2);
+//
+//	// ADC calibration
+//	ADC1->CR |= ADC_CR_ADCAL;
+//	while(ADC1->CR & ADC_CR_ADCAL){} // Wait until calibration is complite
+//
+//	// Enable ADC
+//	ADC1->ISR |= ADC_ISR_ADRDY; // clear ready flag
+//	ADC1->CR |= ADC_CR_ADEN;
+//	while(!(ADC1->ISR & ADC_ISR_ADRDY)){} // Wait until adc is ready
+//
+//	// Sampling time setup
+//	ADC1->SMPR |= 2 << ADC_SMPR_SMP1_Pos; // All channels will use sampling time of smp1 which is 12.5 ADC clock cycles
+//
+//	// Sampling sequence setup
+//	ADC1->CFGR1 |= ADC_CFGR1_CHSELRMOD;		// Enable sequencer ??
+//	ADC1->CHSELR |= 0xF << ADC_CHSELR_SQ2_Pos | 0 << ADC_CHSELR_SQ1_Pos; // only ADC1_IN0 is scuned
+//	while(!(ADC1->ISR & ADC_ISR_CCRDY)){}
+//	ADC1->CFGR1 |= ADC_CFGR1_DMACFG | ADC_CFGR1_DMAEN; // enable DMA
+//
+//	// DMA channel 1 setup
+//	DMA1_Channel1->CPAR = (uint16_t *)&(ADC1->DR);	// Direct read from TIM15->CNT regester
+//	DMA1_Channel1->CMAR = (uint16_t *)adc_current_value;	// Memory address to write to. Уже указатель, поэтому нет необходимости получать его адрес
+//
+//	// for 3 conversions
+//	DMA1_Channel1->CNDTR = 1;			// Number of transfers
+//	DMA1_Channel1->CCR |= 1 << DMA_CCR_MSIZE_Pos | 1 << DMA_CCR_PSIZE_Pos | DMA_CCR_MINC | DMA_CCR_CIRC;		// 16 bit in and out, circular mode, increment in memmory
+//	DMAMUX1_Channel0->CCR |= (5 << DMAMUX_CxCR_DMAREQ_ID_Pos); 	// ADC is 5
+//	DMA1_Channel1->CCR |= DMA_CCR_EN;		// enable DMA
 
 
 	// *** End of ADC and DMA setup *** //
@@ -184,13 +193,13 @@ int main(void)
 	{
 
 		delay_in_milliseconds(200);
-		GPIOD->ODR ^= 0x06;
-		ADC1->CR |= ADC_CR_ADSTART;
-		while(!(ADC1->ISR & ADC_ISR_EOS)){} // wait until sequence is complete
-		ADC1->ISR |= ADC_ISR_EOS;
-
-		current_divider_voltage = (float)(adc_current_value[0])/4096.0f * 3.3f;
-		current_input_voltage = current_divider_voltage * 3.818f;
+//		GPIOD->ODR ^= 0x06;
+//		ADC1->CR |= ADC_CR_ADSTART;
+//		while(!(ADC1->ISR & ADC_ISR_EOS)){} // wait until sequence is complete
+//		ADC1->ISR |= ADC_ISR_EOS;
+//
+//		current_divider_voltage = (float)(adc_current_value[0])/4096.0f * 3.3f;
+//		current_input_voltage = current_divider_voltage * 3.818f;
 
 		// Testing ADC
 
@@ -275,17 +284,17 @@ void SysTick_Handler()
 {
 
 	// *** Speed control handling *** //
-	speed_loop_call_counter += 1;
-	if ( speed_loop_call_counter == SPEED_LOOP_COUNTER_MAX_VALUE )	// 20 times per second
-	{
-		speed_loop_call_counter = 0;
-		motors_get_speed_by_incements(&motor1, SPEED_LOOP_PERIOD);
-		motors_get_speed_by_incements(&motor2, SPEED_LOOP_PERIOD);
+//	speed_loop_call_counter += 1;
+//	if ( speed_loop_call_counter == SPEED_LOOP_COUNTER_MAX_VALUE )	// 20 times per second
+//	{
+//		speed_loop_call_counter = 0;
+//		motors_get_speed_by_incements(&motor1, SPEED_LOOP_PERIOD);
+//		motors_get_speed_by_incements(&motor2, SPEED_LOOP_PERIOD);
 //		float m1_speed_task = motors_speed_controller_handler(&motor1, SPEED_LOOP_PERIOD);
 //		float m2_speed_task = motors_speed_controller_handler(&motor2, SPEED_LOOP_PERIOD);
 //		motor1.set_pwm_duty_cycle((int32_t)m1_speed_task);
 //		motor2.set_pwm_duty_cycle((int32_t)m2_speed_task);
-	}
+//	}
 
 //	// *** Position control handling *** //
 //	position_loop_call_counter += 1;
@@ -312,88 +321,194 @@ void SysTick_Handler()
 		{
 			// Stop and show that data is not capturing any more
 			GPIOD->ODR &= ~0x01;
-			motor1.speed_controller->target_speed = 0.0f;
-			motor2.speed_controller->target_speed = 0.0f;
+			//
+			motor1.set_pwm_duty_cycle(0);
+			motor2.set_pwm_duty_cycle(0);
+//			motor1.speed_controller->target_speed = 0.0f;
+//			motor2.speed_controller->target_speed = 0.0f;
 		}
 	}
 
 }
 // **************************************** //
 
+uint32_t nrf_data_counter = 0;
+
 // ****** NRf24l01+ IRQ handler ****** //
+
 void EXTI2_3_IRQHandler()
 {
+
 	// Clear interrupt flag
 	EXTI->FPR1 |= 0x04;
 
 	// Get new data
-	add_to_mistakes_log(nrf24_read_message(&robot_nrf24, nrf_input_data, 10));
+	add_to_mistakes_log(nrf24_read_message(&robot_nrf24, nrf_input_data, 6));
 	GPIOD->ODR |= 0x01;
-
 	nrf24_data_has_been_captured = 1;
-	float left_motor_speed_task = 0.0f;
-	float left_motor_boost = 0.0f;
-	float right_motor_speed_task = 0.0f;
-	float right_motor_boost = 0.0f;
 
-	// Check for buttons press
-	if((nrf_input_data[4] & 0x14) == 0x14){ // means, that top right button is unpressed
-		// Do nothing
-	}
-	else if((nrf_input_data[4] & 0x04) == 0){
-		left_motor_boost = 0.3f;
-		right_motor_boost = 0.3f;
-	}
-	else{
-		left_motor_boost = 0.6f;
-		right_motor_boost = 0.6f;
+	nrf_data_counter++;
+	GPIOD->ODR &= ~ 0x0E;
+	GPIOD->ODR |= nrf_data_counter << 1;
+
+	if( nrf_data_counter == 7){
+		nrf_data_counter = 0;
 	}
 
-	// Evaluate the speed tasks
-	if(nrf_input_data[2] < 1000 /*means it up*/ && nrf_input_data[1] < 3000 && nrf_input_data[1] > 1000) // Forward
+	// Get desired joystick positions
+	uint8_t left_joystick_left_right = (nrf_input_data[0] & 0x03);
+	uint8_t right_joystick_top_bottom = (nrf_input_data[0] & 0x30) >> 4;
+	uint8_t if_fwd_left_btn_pressed = (nrf_input_data[1] & 0x10) >> 4;
+	uint8_t if_fwd_right_btn_pressed = (nrf_input_data[1] & 0x20) >> 5;
+
+
+	// initialize variables for robot control
+	int32_t left_motor_speed_task = 0;
+	int32_t left_motor_boost = 0;
+	int32_t right_motor_speed_task = 0;
+	int32_t right_motor_boost = 0;
+
+	if(if_fwd_right_btn_pressed)
 	{
-		left_motor_speed_task = 1.0f + left_motor_boost;
-		right_motor_speed_task = 1.0f + right_motor_boost;
+		right_motor_boost = 800;
+		left_motor_boost = 800;
 	}
-	else if(nrf_input_data[2] < 1000 /*means it up*/ && nrf_input_data[1] < 1000)	// Forward left
+	else if (if_fwd_left_btn_pressed)
 	{
-		left_motor_speed_task = 0.2f + left_motor_boost;
-		right_motor_speed_task = 1.0f + right_motor_boost;
-	}
-	else if(nrf_input_data[2] > 1000 && nrf_input_data[2] < 3000 && nrf_input_data[1] < 1000)	// Turn left
-	{
-		left_motor_speed_task = -0.6f - left_motor_boost;
-		right_motor_speed_task = 0.6f + right_motor_boost;
-	}
-	else if(nrf_input_data[2] > 3000 && nrf_input_data[1] < 1000)	// Backward left
-	{
-		left_motor_speed_task = -0.2f - left_motor_boost;
-		right_motor_speed_task = -1.0f - right_motor_boost;
-	}
-	else if(nrf_input_data[2] > 3000  && nrf_input_data[1] < 3000 && nrf_input_data[1] > 1000)	// Backward
-	{
-		left_motor_speed_task = -1.0f - left_motor_boost;
-		right_motor_speed_task = -1.0f - right_motor_boost;
-	}
-	else if(nrf_input_data[2] > 3000 && nrf_input_data[1] > 3000)	// Backward right
-	{
-		left_motor_speed_task = -1.0f - left_motor_boost;
-		right_motor_speed_task = -0.2f - right_motor_boost;
-	}
-	else if(nrf_input_data[2] < 1000 && nrf_input_data[1] > 3000)	// Forward right
-	{
-		left_motor_speed_task = 1.0f + left_motor_boost;
-		right_motor_speed_task = 0.2f + right_motor_boost;
-	}
-	else if(nrf_input_data[2] > 1000 && nrf_input_data[2] < 3000 && nrf_input_data[1] > 3000)	// Turn right
-	{
-		left_motor_speed_task = 0.6f + left_motor_boost;
-		right_motor_speed_task = -0.6f - right_motor_boost;
+		right_motor_boost = 400;
+		left_motor_boost = 400;
 	}
 
-	// Set new speed tasks
-	motor1.speed_controller->target_speed = right_motor_speed_task;
-	motor2.speed_controller->target_speed = left_motor_speed_task;
+
+	if(right_joystick_top_bottom == 1)
+	{
+		if(left_joystick_left_right == 1) // forward-left
+		{
+			left_motor_speed_task = 400 + left_motor_boost;
+			right_motor_speed_task = 1400 + right_motor_boost;
+		}
+		else if(left_joystick_left_right == 2) // forward-right
+		{
+			left_motor_speed_task = 1400 + left_motor_boost;
+			right_motor_speed_task = 400 + right_motor_boost;
+		}
+		else // just forward
+		{
+			left_motor_speed_task = 1400 + left_motor_boost;
+			right_motor_speed_task = 1400 + right_motor_boost;
+		}
+	}
+	else if(right_joystick_top_bottom == 2)
+	{
+		if(left_joystick_left_right == 1) // backward-left
+		{
+			left_motor_speed_task = -400 - left_motor_boost;
+			right_motor_speed_task = -1400 - right_motor_boost;
+		}
+		else if(left_joystick_left_right == 2) // backward-right
+		{
+			left_motor_speed_task = -1400 - left_motor_boost;
+			right_motor_speed_task = -400 - right_motor_boost;
+		}
+		else // just backward
+		{
+			left_motor_speed_task = -1400 - left_motor_boost;
+			right_motor_speed_task = -1400 - right_motor_boost;
+		}
+	}
+	else // right_joystick_top_bottom == 0
+	{
+		if(left_joystick_left_right == 1) // turn left
+		{
+			left_motor_speed_task = -1000 - left_motor_boost;
+			right_motor_speed_task = 1000 + right_motor_boost;
+		}
+		else if (left_joystick_left_right == 2) // turn right
+		{
+			left_motor_speed_task = 1000 + left_motor_boost;
+			right_motor_speed_task = -1000 - right_motor_boost;
+		}
+	}
+
+
+	//	// Set new speed tasks
+	motor1.set_pwm_duty_cycle(right_motor_speed_task);
+	motor2.set_pwm_duty_cycle(left_motor_speed_task);
+
+
+
+//
+//	// Clear interrupt flag
+//	EXTI->FPR1 |= 0x04;
+//
+//	// Get new data
+//	add_to_mistakes_log(nrf24_read_message(&robot_nrf24, nrf_input_data, 10));
+//	GPIOD->ODR |= 0x01;
+//
+//	nrf24_data_has_been_captured = 1;
+//	float left_motor_speed_task = 0.0f;
+//	float left_motor_boost = 0.0f;
+//	float right_motor_speed_task = 0.0f;
+//	float right_motor_boost = 0.0f;
+//
+//	// Check for buttons press
+//	if((nrf_input_data[4] & 0x14) == 0x14){ // means, that top right button is unpressed
+//		// Do nothing
+//	}
+//	else if((nrf_input_data[4] & 0x04) == 0){
+//		left_motor_boost = 0.3f;
+//		right_motor_boost = 0.3f;
+//	}
+//	else{
+//		left_motor_boost = 0.6f;
+//		right_motor_boost = 0.6f;
+//	}
+//
+//	// Evaluate the speed tasks
+//	if(nrf_input_data[2] < 1000 /*means it up*/ && nrf_input_data[1] < 3000 && nrf_input_data[1] > 1000) // Forward
+//	{
+//		left_motor_speed_task = 1.0f + left_motor_boost;
+//		right_motor_speed_task = 1.0f + right_motor_boost;
+//	}
+//	else if(nrf_input_data[2] < 1000 /*means it up*/ && nrf_input_data[1] < 1000)	// Forward left
+//	{
+//		left_motor_speed_task = 0.2f + left_motor_boost;
+//		right_motor_speed_task = 1.0f + right_motor_boost;
+//	}
+//	else if(nrf_input_data[2] > 1000 && nrf_input_data[2] < 3000 && nrf_input_data[1] < 1000)	// Turn left
+//	{
+//		left_motor_speed_task = -0.6f - left_motor_boost;
+//		right_motor_speed_task = 0.6f + right_motor_boost;
+//	}
+//	else if(nrf_input_data[2] > 3000 && nrf_input_data[1] < 1000)	// Backward left
+//	{
+//		left_motor_speed_task = -0.2f - left_motor_boost;
+//		right_motor_speed_task = -1.0f - right_motor_boost;
+//	}
+//	else if(nrf_input_data[2] > 3000  && nrf_input_data[1] < 3000 && nrf_input_data[1] > 1000)	// Backward
+//	{
+//		left_motor_speed_task = -1.0f - left_motor_boost;
+//		right_motor_speed_task = -1.0f - right_motor_boost;
+//	}
+//	else if(nrf_input_data[2] > 3000 && nrf_input_data[1] > 3000)	// Backward right
+//	{
+//		left_motor_speed_task = -1.0f - left_motor_boost;
+//		right_motor_speed_task = -0.2f - right_motor_boost;
+//	}
+//	else if(nrf_input_data[2] < 1000 && nrf_input_data[1] > 3000)	// Forward right
+//	{
+//		left_motor_speed_task = 1.0f + left_motor_boost;
+//		right_motor_speed_task = 0.2f + right_motor_boost;
+//	}
+//	else if(nrf_input_data[2] > 1000 && nrf_input_data[2] < 3000 && nrf_input_data[1] > 3000)	// Turn right
+//	{
+//		left_motor_speed_task = 0.6f + left_motor_boost;
+//		right_motor_speed_task = -0.6f - right_motor_boost;
+//	}
+//
+//	// Set new speed tasks
+//	motor1.speed_controller->target_speed = right_motor_speed_task;
+//	motor2.speed_controller->target_speed = left_motor_speed_task;
 }
 // **************************************** //
 
